@@ -6,7 +6,7 @@ import { BlockchainRecords } from './components/BlockchainRecords';
 import { AnalyticsSection } from './components/AnalyticsSection';
 import { MethodologySection } from './components/MethodologySection';
 import { TechStack } from './components/TechStack';
-import { TeamSection } from './components/TeamSection';
+
 import { FooterSection } from './components/FooterSection';
 
 export default function App() {
