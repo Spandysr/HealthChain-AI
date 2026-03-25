@@ -21,7 +21,7 @@ export default function App() {
         <AnalyticsSection />
         <MethodologySection />
         <TechStack />
-        <TeamSection />
+        
       </main>
       <FooterSection />
     </div>
