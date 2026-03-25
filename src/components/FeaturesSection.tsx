@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { Brain, Shield, Database, Users, Lock, BarChart3 } from 'lucide-react';
+import blockchainImage from '@/assets/blockchain-network.jpg';
 
 const features = [
   {
@@ -40,11 +41,24 @@ const features = [
   },
 ];
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1, delayChildren: 0.2 },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] } },
+};
+
 export function FeaturesSection() {
   return (
-    <section id="features" className="py-24 px-6 lg:px-12 bg-background">
+    <section id="features" className="py-24 px-6 lg:px-12 bg-background transition-colors duration-700">
       <div className="max-w-7xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-16">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-100px' }} transition={{ duration: 0.6 }} className="text-center mb-16">
           <p className="text-sm font-semibold text-primary uppercase tracking-wider mb-3">Platform Capabilities</p>
           <h2 className="font-display text-3xl sm:text-4xl font-bold text-foreground mb-4">
             Intelligent Healthcare, Secured by Blockchain
@@ -54,24 +68,49 @@ export function FeaturesSection() {
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {features.map((f, i) => (
+        {/* Blockchain image banner */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true, margin: '-100px' }}
+          transition={{ duration: 0.8 }}
+          className="relative rounded-2xl overflow-hidden mb-16 shadow-xl"
+        >
+          <img src={blockchainImage} alt="Blockchain network securing medical data with interconnected nodes and digital locks" loading="lazy" width={1280} height={720} className="w-full h-48 sm:h-64 object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-background/40 to-transparent flex items-center">
+            <div className="px-8 sm:px-12 max-w-lg">
+              <h3 className="font-display text-2xl sm:text-3xl font-bold text-foreground mb-2">Secured by Ethereum</h3>
+              <p className="text-muted-foreground text-sm sm:text-base">Every medical record hash stored on-chain via smart contracts for immutable verification.</p>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: '-100px' }}
+          className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
+        >
+          {features.map((f) => (
             <motion.div
               key={f.title}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
-              className="bg-card border border-border rounded-xl p-8 hover:shadow-lg hover:border-primary/20 gentle-animation group"
+              variants={itemVariants}
+              whileHover={{ y: -6, boxShadow: '0 20px 40px rgba(0,0,0,0.08)' }}
+              className="bg-card border border-border rounded-xl p-8 hover:border-primary/20 transition-all duration-500 group cursor-default"
             >
-              <div className={`w-12 h-12 rounded-xl ${f.color} flex items-center justify-center mb-5`}>
+              <motion.div
+                whileHover={{ rotate: 5, scale: 1.1 }}
+                transition={{ type: 'spring', stiffness: 300 }}
+                className={`w-12 h-12 rounded-xl ${f.color} flex items-center justify-center mb-5`}
+              >
                 <f.icon className="w-6 h-6" />
-              </div>
-              <h3 className="font-display text-xl font-semibold text-foreground mb-3">{f.title}</h3>
+              </motion.div>
+              <h3 className="font-display text-xl font-semibold text-foreground mb-3 group-hover:text-primary transition-colors duration-300">{f.title}</h3>
               <p className="text-muted-foreground leading-relaxed">{f.description}</p>
             </motion.div>
           ))}
-        </div>
+        </motion.div>
       </div>
     </section>
   );
