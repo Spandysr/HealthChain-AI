@@ -1,9 +1,83 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
-import { monthlyPredictions, riskDistribution, dashboardStats } from '@/data/healthData';
-import { TrendingUp, Activity, Clock } from 'lucide-react';
+import { TrendingUp, Activity, Clock, Users, FileText, CheckSquare, AlertCircle } from 'lucide-react';
+
+interface AnalyticsSummary {
+  totalPatients: number;
+  totalPredictions: number;
+  totalRecords: number;
+  verifiedRecords: number;
+  riskDistribution: {
+    Low: number;
+    Medium: number;
+    High: number;
+    Critical: number;
+  };
+}
+
+const riskColors: { [key: string]: string } = {
+  Low: 'var(--healthcare-green)',
+  Medium: 'var(--healthcare-amber)',
+  High: 'var(--healthcare-red)',
+  Critical: 'var(--blockchain-purple)',
+};
 
 export function AnalyticsSection() {
+  const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchSummary = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/analytics/summary');
+        if (!response.ok) {
+          throw new Error('Failed to fetch analytics summary');
+        }
+        const data = await response.json();
+        setSummary(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSummary();
+  }, []);
+
+  const riskData = summary ? Object.entries(summary.riskDistribution).map(([name, value]) => ({
+    name,
+    value,
+    color: riskColors[name] || '#8884d8'
+  })) : [];
+
+  const stats = summary ? [
+    { label: 'Total Patients', value: summary.totalPatients.toLocaleString(), icon: Users },
+    { label: 'Total Predictions', value: summary.totalPredictions.toLocaleString(), icon: TrendingUp },
+    { label: 'Total Records', value: summary.totalRecords.toLocaleString(), icon: FileText },
+    { label: 'Records Verified', value: summary.verifiedRecords.toLocaleString(), icon: CheckSquare },
+  ] : [];
+
+  if (loading) {
+    return (
+      <section className="py-24 px-6 lg:px-12 bg-background transition-colors duration-700 text-center">
+        <p>Loading Analytics...</p>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="py-24 px-6 lg:px-12 bg-background transition-colors duration-700 text-center text-destructive">
+        <AlertCircle className="mx-auto h-12 w-12" />
+        <p className="mt-4">Could not load analytics data: {error}</p>
+      </section>
+    );
+  }
+
   return (
     <section className="py-24 px-6 lg:px-12 bg-background transition-colors duration-700">
       <div className="max-w-7xl mx-auto">
@@ -19,12 +93,7 @@ export function AnalyticsSection() {
 
         {/* Stats row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {[
-            { label: 'Blockchain Txns', value: dashboardStats.blockchainTransactions.toLocaleString(), icon: Activity, change: '+12.5%' },
-            { label: 'Avg Response Time', value: `${dashboardStats.avgResponseTime}s`, icon: Clock, change: '-0.3s' },
-            { label: 'Prediction Accuracy', value: `${dashboardStats.accuracyRate}%`, icon: TrendingUp, change: '+1.2%' },
-            { label: 'Records Verified', value: dashboardStats.recordsVerified.toLocaleString(), icon: Activity, change: '+8.3%' },
-          ].map((s, i) => (
+          {stats.map((s, i) => (
             <motion.div
               key={s.label}
               initial={{ opacity: 0, y: 20 }}
@@ -36,7 +105,6 @@ export function AnalyticsSection() {
             >
               <div className="flex items-center justify-between mb-2">
                 <s.icon className="w-5 h-5 text-muted-foreground" />
-                <span className="text-xs font-medium text-healthcare-green">{s.change}</span>
               </div>
               <p className="text-2xl font-bold font-display text-foreground">{s.value}</p>
               <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
@@ -47,27 +115,11 @@ export function AnalyticsSection() {
         <div className="grid lg:grid-cols-2 gap-6">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-100px' }} transition={{ duration: 0.6 }}
             className="bg-card border border-border rounded-xl p-6 transition-colors duration-500">
-            <h3 className="font-display text-lg font-semibold text-foreground mb-6">Monthly Predictions by Disease</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={monthlyPredictions}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="month" stroke="var(--muted-foreground)" fontSize={12} />
-                <YAxis stroke="var(--muted-foreground)" fontSize={12} />
-                <Tooltip contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--foreground)' }} />
-                <Bar dataKey="diabetes" name="Diabetes" fill="var(--healthcare-teal)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="heart" name="Heart Disease" fill="var(--healthcare-red)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="kidney" name="Kidney Disease" fill="var(--blockchain-purple)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </motion.div>
-
-          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-100px' }} transition={{ delay: 0.1, duration: 0.6 }}
-            className="bg-card border border-border rounded-xl p-6 transition-colors duration-500">
             <h3 className="font-display text-lg font-semibold text-foreground mb-6">Patient Risk Distribution</h3>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
-                <Pie data={riskDistribution} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} innerRadius={60} paddingAngle={4}>
-                  {riskDistribution.map((entry) => (
+                <Pie data={riskData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} innerRadius={60} paddingAngle={4}>
+                  {riskData.map((entry) => (
                     <Cell key={entry.name} fill={entry.color} />
                   ))}
                 </Pie>
@@ -75,6 +127,14 @@ export function AnalyticsSection() {
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
+          </motion.div>
+          
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-100px' }} transition={{ delay: 0.1, duration: 0.6 }}
+            className="bg-card border border-border rounded-xl p-6 transition-colors duration-500">
+            <h3 className="font-display text-lg font-semibold text-foreground mb-6">More Analytics Coming Soon</h3>
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              <p>Monthly prediction charts will be added here.</p>
+            </div>
           </motion.div>
         </div>
       </div>
