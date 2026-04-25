@@ -56,18 +56,20 @@ const riskBarColors: Record<string, string> = {
   Critical: 'bg-blockchain-purple',
 };
 
-type Step = 'form' | 'results';
+type RegistrationStep = 'form' | 'results' | 'saved';
 
 export function PatientRegistration() {
-  const [step, setStep] = useState<Step>('form');
+  const [step, setStep] = useState<RegistrationStep>('form');
   const [formData, setFormData] = useState<PatientFormData>({ 
     name: '', age: '', gender: 'Male', contact: '',
     bloodPressure: '120', cholesterol: '190', glucose: '100', bmi: '24'
   });
   const [results, setResults] = useState<PredictionResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [savedPatientName, setSavedPatientName] = useState('');
 
   const validateForm = () => {
     const errs: Record<string, string> = {};
@@ -106,7 +108,16 @@ export function PatientRegistration() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to get prediction from the server.');
+        let message = `Failed to get prediction from the server (HTTP ${response.status}).`;
+        try {
+          const errorPayload = await response.json();
+          if (errorPayload?.message && typeof errorPayload.message === 'string') {
+            message = errorPayload.message;
+          }
+        } catch {
+          // Keep default message when response body is not JSON.
+        }
+        throw new Error(message);
       }
 
       const data: PredictionResult = await response.json();
@@ -127,24 +138,42 @@ export function PatientRegistration() {
     setResults(null);
     setErrors({});
     setError(null);
+    setSaving(false);
+    setSavedPatientName('');
     setStep('form');
+  };
+
+  const handleSavePatientRecord = async () => {
+    setSaving(true);
+    try {
+      setSavedPatientName(formData.name);
+      setStep('saved');
+      window.dispatchEvent(new CustomEvent('healthchain-record-saved', {
+        detail: {
+          patientName: formData.name,
+          predictionId: results?.id ?? null,
+        }
+      }));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const stepIndicator = (
     <div className="flex items-center justify-center gap-2 mb-8">
-      {(['form', 'results'] as Step[]).map((s, i) => (
+      {(['form', 'results', 'saved'] as RegistrationStep[]).map((s, i) => (
         <div key={s} className="flex items-center gap-2">
           <motion.div
             animate={{ scale: step === s ? 1.15 : 1 }}
             className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-colors duration-500 ${
               step === s ? 'bg-primary text-primary-foreground' :
-              (['form', 'results'].indexOf(step) > i) ? 'bg-primary/20 text-primary' :
+              (['form', 'results', 'saved'].indexOf(step) > i) ? 'bg-primary/20 text-primary' :
               'bg-muted text-muted-foreground'
             }`}
           >
             {i + 1}
           </motion.div>
-          {i < 1 && <div className={`w-12 h-0.5 transition-colors duration-500 ${['form', 'results'].indexOf(step) > i ? 'bg-primary/40' : 'bg-muted'}`} />}
+          {i < 2 && <div className={`w-12 h-0.5 transition-colors duration-500 ${['form', 'results', 'saved'].indexOf(step) > i ? 'bg-primary/40' : 'bg-muted'}`} />}
         </div>
       ))}
     </div>
@@ -273,8 +302,63 @@ export function PatientRegistration() {
                     </div>
 
                     <div className="flex gap-3 mt-8">
-                      <motion.button onClick={resetForm} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                        className="flex-1 bg-primary text-primary-foreground font-semibold py-3.5 rounded-xl hover:opacity-90 transition-all duration-300 flex items-center justify-center gap-2">
+                      <motion.button
+                        onClick={handleSavePatientRecord}
+                        disabled={saving}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="flex-1 bg-primary text-primary-foreground font-semibold py-3.5 rounded-xl hover:opacity-90 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-60"
+                      >
+                        {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />} Save Patient Record
+                      </motion.button>
+                      <motion.button
+                        onClick={resetForm}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="px-6 bg-background border border-border text-foreground font-semibold py-3.5 rounded-xl hover:bg-muted transition-all duration-300 flex items-center justify-center gap-2"
+                      >
+                        <X className="w-4 h-4" /> Cancel
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                )}
+
+                {step === 'saved' && (
+                  <motion.div
+                    key="saved"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    transition={{ duration: 0.35 }}
+                    className="text-center"
+                  >
+                    <div className="w-16 h-16 rounded-full bg-healthcare-green/15 text-healthcare-green flex items-center justify-center mx-auto mb-4">
+                      <CheckCircle className="w-9 h-9" />
+                    </div>
+                    <h3 className="font-display text-2xl font-bold text-foreground mb-2">Patient Record Saved</h3>
+                    <p className="text-muted-foreground mb-2">Registration completed successfully for:</p>
+                    <p className="text-lg font-semibold text-primary mb-8">{savedPatientName || formData.name}</p>
+
+                    <div className="bg-accent/50 rounded-lg p-4 mb-6 text-left">
+                      <p className="text-sm text-foreground"><span className="font-medium">Status:</span> Record added to blockchain records feed.</p>
+                      <p className="text-sm text-foreground mt-1"><span className="font-medium">Next:</span> Scroll to Records section to see the new entry with patient name.</p>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <motion.a
+                        href="#records"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="flex-1 bg-primary text-primary-foreground font-semibold py-3.5 rounded-xl hover:opacity-90 transition-all duration-300 flex items-center justify-center gap-2"
+                      >
+                        <FileText className="w-5 h-5" /> View Blockchain Records
+                      </motion.a>
+                      <motion.button
+                        onClick={resetForm}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="flex-1 bg-background border border-border text-foreground font-semibold py-3.5 rounded-xl hover:bg-muted transition-all duration-300 flex items-center justify-center gap-2"
+                      >
                         <UserPlus className="w-5 h-5" /> Register Another Patient
                       </motion.button>
                     </div>

@@ -4,6 +4,20 @@ import { pool } from '../database/db';
 
 const twilioClient = Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
+const sendWhatsAppMessage = async (to: string, body: string): Promise<void> => {
+    try {
+        await twilioClient.messages.create({
+            from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
+            to: to,
+            body: body,
+        });
+        await pool.query('INSERT INTO whatsapp_messages SET ?', [{ to_number: to, message_body: body, direction: 'outbound' }]);
+    } catch (error) {
+        console.error('Error sending WhatsApp message:', error);
+        throw error;
+    }
+};
+
 const generateResponseMessage = (prediction: any): string => {
     const { recommendations, patientSummary, diabetes, cardiovascularDisease, chronicKidneyDisease } = prediction;
 
@@ -57,10 +71,10 @@ export const whatsappService = {
             const patientData = JSON.parse(body);
             const prediction = await predictionService.createPrediction(patientData);
             const responseMessage = generateResponseMessage(prediction);
-            await this.sendMessage(from, responseMessage);
+            await sendWhatsAppMessage(from, responseMessage);
         } catch (error) {
             console.error("Could not parse patient data from WhatsApp message", error);
-            await this.sendMessage(from, "I'm sorry, I couldn't understand the report format. Please provide the patient data in a valid JSON format.");
+            await sendWhatsAppMessage(from, "I'm sorry, I couldn't understand the report format. Please provide the patient data in a valid JSON format.");
         }
     },
 
@@ -70,20 +84,10 @@ export const whatsappService = {
             throw new Error('Prediction not found');
         }
         const responseMessage = generateResponseMessage(prediction);
-        await this.sendMessage(to, responseMessage);
+        await sendWhatsAppMessage(to, responseMessage);
     },
 
     sendMessage: async (to: string, body: string): Promise<void> => {
-        try {
-            await twilioClient.messages.create({
-                from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
-                to: to,
-                body: body,
-            });
-            await pool.query('INSERT INTO whatsapp_messages SET ?', [{ to_number: to, message_body: body, direction: 'outbound' }]);
-        } catch (error) {
-            console.error('Error sending WhatsApp message:', error);
-            throw error;
-        }
+        await sendWhatsAppMessage(to, body);
     }
 };

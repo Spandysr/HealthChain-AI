@@ -28,24 +28,54 @@ export function AnalyticsSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchSummary = async () => {
-      try {
+  const fetchSummary = async (showLoading = false) => {
+    try {
+      if (showLoading) {
         setLoading(true);
-        const response = await fetch('/api/analytics/summary');
-        if (!response.ok) {
-          throw new Error('Failed to fetch analytics summary');
-        }
-        const data = await response.json();
-        setSummary(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
-      } finally {
+      }
+      setError(null);
+      const response = await fetch('/api/analytics/summary');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch analytics summary (HTTP ${response.status})`);
+      }
+      const data = await response.json();
+      setSummary(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+    } finally {
+      if (showLoading) {
         setLoading(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    fetchSummary(true);
+
+    const interval = window.setInterval(() => {
+      fetchSummary(false);
+    }, 5000);
+
+    const handleRecordSaved = () => {
+      fetchSummary(false);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchSummary(false);
       }
     };
 
-    fetchSummary();
+    window.addEventListener('healthchain-record-saved', handleRecordSaved);
+    window.addEventListener('focus', handleRecordSaved);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('healthchain-record-saved', handleRecordSaved);
+      window.removeEventListener('focus', handleRecordSaved);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   const riskData = summary ? Object.entries(summary.riskDistribution).map(([name, value]) => ({
@@ -69,11 +99,25 @@ export function AnalyticsSection() {
     );
   }
 
+  if (!summary) {
+    return (
+      <section className="py-24 px-6 lg:px-12 bg-background transition-colors duration-700 text-center">
+        <p className="text-muted-foreground">No analytics data available yet.</p>
+      </section>
+    );
+  }
+
   if (error) {
     return (
       <section className="py-24 px-6 lg:px-12 bg-background transition-colors duration-700 text-center text-destructive">
         <AlertCircle className="mx-auto h-12 w-12" />
         <p className="mt-4">Could not load analytics data: {error}</p>
+        <button
+          onClick={fetchSummary}
+          className="mt-4 inline-flex items-center px-4 py-2 rounded-lg border border-destructive/40 text-destructive hover:bg-destructive/10 transition-colors"
+        >
+          Retry loading analytics
+        </button>
       </section>
     );
   }
@@ -116,17 +160,23 @@ export function AnalyticsSection() {
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-100px' }} transition={{ duration: 0.6 }}
             className="bg-card border border-border rounded-xl p-6 transition-colors duration-500">
             <h3 className="font-display text-lg font-semibold text-foreground mb-6">Patient Risk Distribution</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie data={riskData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} innerRadius={60} paddingAngle={4}>
-                  {riskData.map((entry) => (
-                    <Cell key={entry.name} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--foreground)' }} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+            {riskData.some((entry) => entry.value > 0) ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie data={riskData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} innerRadius={60} paddingAngle={4}>
+                    {riskData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ backgroundColor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--foreground)' }} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground text-sm">
+                Risk chart will populate as predictions are uploaded.
+              </div>
+            )}
           </motion.div>
           
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-100px' }} transition={{ delay: 0.1, duration: 0.6 }}

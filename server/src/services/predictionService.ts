@@ -2,6 +2,14 @@ import { pool } from '../database/db';
 import { PatientData, PredictionResult } from '../types/patient';
 import { recordService } from './recordService';
 
+let fallbackPredictionId = 1;
+let fallbackPatientId = 9000;
+const fallbackPredictions: any[] = [];
+
+export const getFallbackPredictionsSnapshot = () => {
+    return [...fallbackPredictions];
+};
+
 const calculateRisk = (score: number): 'Low' | 'Medium' | 'High' | 'Critical' => {
     if (score < 0.3) return 'Low';
     if (score < 0.6) return 'Medium';
@@ -40,44 +48,77 @@ const simulatePrediction = (data: PatientData): PredictionResult => {
 export const predictionService = {
     createPrediction: async (patientData: PatientData): Promise<any> => {
         const prediction = simulatePrediction(patientData);
+        const fallbackResult = { id: fallbackPredictionId++, ...prediction };
 
-        const [patientRows]: any = await pool.query('SELECT id FROM patients WHERE name = ? AND age = ?', [patientData.name, patientData.age]);
-        let patientId;
+        try {
+            const [patientRows]: any = await pool.query('SELECT id FROM patients WHERE name = ? AND age = ?', [patientData.name, patientData.age]);
+            let patientId;
 
-        if (patientRows.length > 0) {
-            patientId = patientRows[0].id;
-        } else {
-            const [newPatient]: any = await pool.query('INSERT INTO patients SET ?', [patientData]);
-            patientId = newPatient.insertId;
+            if (patientRows.length > 0) {
+                patientId = patientRows[0].id;
+            } else {
+                const [newPatient]: any = await pool.query('INSERT INTO patients SET ?', [patientData]);
+                patientId = newPatient.insertId;
+            }
+
+            const predictionResult = {
+                patient_id: patientId,
+                diabetes_prob: prediction.diabetes.probability,
+                diabetes_risk: prediction.diabetes.risk,
+                cvd_prob: prediction.cardiovascularDisease.probability,
+                cvd_risk: prediction.cardiovascularDisease.risk,
+                ckd_prob: prediction.chronicKidneyDisease.probability,
+                ckd_risk: prediction.chronicKidneyDisease.risk,
+                recommendations: JSON.stringify(prediction.recommendations),
+                patient_summary: prediction.patientSummary
+            };
+
+            const [newPrediction]: any = await pool.query('INSERT INTO predictions SET ?', [predictionResult]);
+
+            // Best-effort blockchain record persistence.
+            try {
+                await recordService.createRecord(patientId, JSON.stringify({ patientData, prediction }), patientData.name);
+            } catch (error) {
+                console.error('Record persistence failed, returning prediction anyway.', error);
+            }
+
+            return { id: newPrediction.insertId, ...prediction };
+        } catch (error) {
+            console.error('Database unavailable, returning in-memory prediction.', error);
+            const patientId = fallbackPatientId++;
+
+            try {
+                await recordService.createRecord(patientId, JSON.stringify({ patientData, prediction }), patientData.name);
+            } catch (recordError) {
+                console.error('Fallback record creation failed.', recordError);
+            }
+
+            fallbackPredictions.unshift({
+                ...fallbackResult,
+                patient_id: patientId,
+                created_at: new Date().toISOString(),
+            });
+            return fallbackResult;
         }
-
-        const predictionResult = {
-            patient_id: patientId,
-            diabetes_prob: prediction.diabetes.probability,
-            diabetes_risk: prediction.diabetes.risk,
-            cvd_prob: prediction.cardiovascularDisease.probability,
-            cvd_risk: prediction.cardiovascularDisease.risk,
-            ckd_prob: prediction.chronicKidneyDisease.probability,
-            ckd_risk: prediction.chronicKidneyDisease.risk,
-            recommendations: JSON.stringify(prediction.recommendations),
-            patient_summary: prediction.patientSummary
-        };
-
-        const [newPrediction]: any = await pool.query('INSERT INTO predictions SET ?', [predictionResult]);
-        
-        // Create a blockchain record for the prediction
-        await recordService.createRecord(patientId, JSON.stringify({ patientData, prediction }));
-
-        return { id: newPrediction.insertId, ...prediction };
     },
 
     getPredictions: async (): Promise<any> => {
-        const [rows] = await pool.query('SELECT * FROM predictions');
-        return rows;
+        try {
+            const [rows] = await pool.query('SELECT * FROM predictions');
+            return rows;
+        } catch (error) {
+            console.error('Database unavailable, returning in-memory predictions.', error);
+            return fallbackPredictions;
+        }
     },
 
     getPredictionById: async (id: number): Promise<any> => {
-        const [rows]: any = await pool.query('SELECT * FROM predictions WHERE id = ?', [id]);
-        return rows[0];
+        try {
+            const [rows]: any = await pool.query('SELECT * FROM predictions WHERE id = ?', [id]);
+            return rows[0];
+        } catch (error) {
+            console.error('Database unavailable, returning in-memory prediction by id.', error);
+            return fallbackPredictions.find(prediction => prediction.id === id);
+        }
     }
 };

@@ -6,6 +6,7 @@ import medicalRecordsImage from '@/assets/medical-records.jpg';
 interface MedicalRecord {
   id: number;
   patient_id: number;
+  patient_name?: string;
   report: string;
   report_hash: string;
   blockchain_tx_hash: string;
@@ -23,26 +24,38 @@ export function BlockchainRecords() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchRecords = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch('/api/records');
-        if (!response.ok) {
-          throw new Error('Failed to fetch records');
-        }
-        const data = await response.json();
-        setRecords(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
-      } finally {
-        setLoading(false);
+  const fetchRecords = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch('/api/records');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch records (HTTP ${response.status})`);
       }
+      const data = await response.json();
+      setRecords(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleRecordSaved = () => {
+      fetchRecords();
     };
+
     fetchRecords();
+    window.addEventListener('healthchain-record-saved', handleRecordSaved);
+
+    return () => {
+      window.removeEventListener('healthchain-record-saved', handleRecordSaved);
+    };
   }, []);
 
   const filteredRecords = records.filter(r =>
+    (r.patient_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     r.patient_id.toString().includes(searchQuery.toLowerCase()) ||
     r.id.toString().includes(searchQuery.toLowerCase()) ||
     r.report.toLowerCase().includes(searchQuery.toLowerCase())
@@ -121,7 +134,18 @@ export function BlockchainRecords() {
         </motion.div>
 
         {loading && <div className="text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto" /></div>}
-        {error && <div className="text-center text-destructive"><AlertCircle className="w-8 h-8 mx-auto" /> {error}</div>}
+        {error && (
+          <div className="text-center text-destructive space-y-3">
+            <AlertCircle className="w-8 h-8 mx-auto" />
+            <p>{error}</p>
+            <button
+              onClick={fetchRecords}
+              className="inline-flex items-center px-4 py-2 rounded-lg border border-destructive/40 text-destructive hover:bg-destructive/10 transition-colors"
+            >
+              Retry loading records
+            </button>
+          </div>
+        )}
 
         {!loading && !error && (
           <div className="grid lg:grid-cols-3 gap-6">
@@ -147,9 +171,10 @@ export function BlockchainRecords() {
                         </motion.div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <h4 className="font-semibold text-foreground">Patient ID: {rec.patient_id}</h4>
+                            <h4 className="font-semibold text-foreground">{rec.patient_name || `Patient ${rec.patient_id}`}</h4>
                             <span className="text-xs text-muted-foreground">Record #{rec.id}</span>
                           </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">Patient ID: {rec.patient_id}</p>
                           <p className="text-sm text-muted-foreground mt-0.5 truncate">Report: {rec.report.substring(0, 50)}...</p>
                           <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
                             <span>{new Date(rec.created_at).toLocaleDateString()}</span>
