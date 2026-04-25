@@ -40,11 +40,66 @@ export function PredictionSection() {
 
   const handlePredict = async () => {
     setLoading(true);
-    setResults(null);
-    await new Promise(r => setTimeout(r, 1800));
-    const res = predictDisease(params);
-    setResults(res);
-    setLoading(false);
+    try {
+      const response = await fetch('/api/predictions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: "Guest Patient", // Default for direct analysis
+          age: params.age,
+          sex: "Unknown",
+          bloodPressure: params.bloodPressureSystolic,
+          cholesterol: params.cholesterol,
+          glucose: params.glucose,
+          bmi: params.bmi,
+          ...params
+        }),
+      });
+      
+      if (!response.ok) throw new Error('Prediction failed');
+      
+      const data = await response.json();
+      
+      // Transform Python backend response to frontend format
+      const formattedResults: PredictionResult[] = [
+        {
+          disease: 'Diabetes Mellitus',
+          riskLevel: data.diabetes.risk,
+          probability: Math.round(data.diabetes.probability * 100),
+          factors: ['Glucose', 'BMI', 'Age'],
+          recommendation: data.recommendations.dietaryAdvice,
+          accuracyConclusion: data.accuracy_conclusion,
+          confidenceLevel: data.confidence_level
+        },
+        {
+          disease: 'Cardiovascular Disease',
+          riskLevel: data.cardiovascularDisease.risk,
+          probability: Math.round(data.cardiovascularDisease.probability * 100),
+          factors: ['BP', 'Cholesterol', 'BMI'],
+          recommendation: data.recommendations.nextActions,
+          accuracyConclusion: data.accuracy_conclusion,
+          confidenceLevel: data.confidence_level
+        },
+        {
+          disease: 'Chronic Kidney Disease',
+          riskLevel: data.chronicKidneyDisease.risk,
+          probability: Math.round(data.chronicKidneyDisease.probability * 100),
+          factors: ['BP', 'Glucose', 'Creatinine'],
+          recommendation: data.recommendations.doctorVisit,
+          accuracyConclusion: data.accuracy_conclusion,
+          confidenceLevel: data.confidence_level
+        }
+      ];
+      
+      setResults(formattedResults);
+    } catch (err) {
+      console.error(err);
+      // Fallback if backend is down
+      const res = predictDisease(params);
+      setResults(res);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleShareWhatsApp = () => {
@@ -218,6 +273,28 @@ export function PredictionSection() {
                           <Info className="w-4 h-4 text-primary mt-0.5 shrink-0" />
                           <p className="text-sm text-foreground">{r.recommendation}</p>
                         </div>
+                        
+                        {r.accuracyConclusion && (
+                          <div className="mt-4 pt-4 border-t border-border">
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-xs font-semibold text-primary uppercase tracking-wider">AI Accuracy Analysis</p>
+                              <div className="flex items-center gap-1.5">
+                                <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-primary" 
+                                    style={{ width: `${(r.confidenceLevel || 0) * 100}%` }}
+                                  />
+                                </div>
+                                <span className="text-[10px] font-bold text-muted-foreground">
+                                  {Math.round((r.confidenceLevel || 0) * 100)}% Confidence
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground italic leading-relaxed">
+                              "{r.accuracyConclusion}"
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </motion.div>
                   ))}

@@ -22,6 +22,8 @@ export interface PredictionResult {
   probability: number;
   factors: string[];
   recommendation: string;
+  accuracyConclusion?: string;
+  confidenceLevel?: number;
 }
 
 export interface Patient {

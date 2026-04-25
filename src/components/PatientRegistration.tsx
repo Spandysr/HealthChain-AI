@@ -29,6 +29,8 @@ interface PredictionResult {
     doctorVisit: string;
   };
   patientSummary: string;
+  accuracy_conclusion?: string;
+  confidence_level?: number;
 }
 
 interface PatientFormData {
@@ -313,10 +315,24 @@ export function PatientRegistration() {
                             <p className="text-sm text-foreground mb-2"><span className="font-medium">Dietary Advice:</span> {results.recommendations.dietaryAdvice}</p>
                             <p className="text-sm text-foreground"><span className="font-medium">Doctor Visit:</span> {results.recommendations.doctorVisit}</p>
                         </div>
-                        <div className="bg-accent/50 p-4 rounded-md">
+                         <div className="bg-accent/50 p-4 rounded-md">
                             <h4 className="font-semibold text-foreground mb-2">Patient Summary</h4>
                             <p className="text-sm text-foreground">{results.patientSummary}</p>
                         </div>
+                        
+                        {results.accuracy_conclusion && (
+                          <div className="bg-primary/5 p-4 rounded-md border border-primary/20">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-semibold text-primary text-sm uppercase tracking-wider">AI Accuracy Analysis</h4>
+                              <span className="text-xs font-bold text-primary">
+                                {Math.round((results.confidence_level || 0) * 100)}% Confidence
+                              </span>
+                            </div>
+                            <p className="text-sm text-muted-foreground italic">
+                              "{results.accuracy_conclusion}"
+                            </p>
+                          </div>
+                        )}
                     </div>
 
                     <div className="flex gap-3 mt-8">
