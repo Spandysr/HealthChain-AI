@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UserPlus, Brain, FileText, CheckCircle, AlertTriangle, Info, Loader2, X, User, Phone, Droplets, Calendar } from 'lucide-react';
+import { UserPlus, Brain, FileText, CheckCircle, AlertTriangle, Info, Loader2, X, User, Phone, Droplets, Calendar, MessageSquare } from 'lucide-react';
 
 // Updated interfaces to match backend
 interface PatientData {
@@ -157,6 +157,24 @@ export function PatientRegistration() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleShareWhatsApp = () => {
+    if (!results) return;
+    
+    const diabetes = results.diabetes;
+    const cvd = results.cardiovascularDisease;
+    const ckd = results.chronicKidneyDisease;
+    
+    const summary = [
+      `*Diabetes*: ${diabetes.risk} Risk (${(diabetes.probability * 100).toFixed(1)}%)`,
+      `*Cardiovascular Disease*: ${cvd.risk} Risk (${(cvd.probability * 100).toFixed(1)}%)`,
+      `*Chronic Kidney Disease*: ${ckd.risk} Risk (${(ckd.probability * 100).toFixed(1)}%)`,
+    ].join('\n');
+    
+    const text = encodeURIComponent(`*HealthChain-AI Analysis for ${formData.name}*\n\n${summary}\n\n*Summary*: ${results.patientSummary}\n\n*Next Actions*: ${results.recommendations.nextActions}\n\n_Generated via HealthChain-AI_`);
+    
+    window.open(`https://wa.me/${formData.contact.replace(/\D/g, '')}?text=${text}`, '_blank');
   };
 
   const stepIndicator = (
@@ -320,6 +338,15 @@ export function PatientRegistration() {
                         <X className="w-4 h-4" /> Cancel
                       </motion.button>
                     </div>
+                    
+                    <motion.button
+                      onClick={handleShareWhatsApp}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="w-full mt-4 bg-[#25D366] text-white font-semibold py-3 rounded-xl hover:opacity-90 transition-all duration-300 flex items-center justify-center gap-2 shadow-sm"
+                    >
+                      <MessageSquare className="w-5 h-5" /> Share Report via WhatsApp
+                    </motion.button>
                   </motion.div>
                 )}
 
@@ -362,6 +389,15 @@ export function PatientRegistration() {
                         <UserPlus className="w-5 h-5" /> Register Another Patient
                       </motion.button>
                     </div>
+
+                    <motion.button
+                      onClick={handleShareWhatsApp}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="w-full mt-4 bg-[#25D366] text-white font-semibold py-3 rounded-xl hover:opacity-90 transition-all duration-300 flex items-center justify-center gap-2 shadow-sm"
+                    >
+                      <MessageSquare className="w-5 h-5" /> Share Summary with Patient
+                    </motion.button>
                   </motion.div>
                 )}
               </AnimatePresence>

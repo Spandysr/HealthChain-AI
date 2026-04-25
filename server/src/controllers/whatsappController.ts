@@ -3,6 +3,7 @@ import { whatsappService } from '../services/whatsappService';
 
 export const whatsappWebhook = async (req: Request, res: Response) => {
     try {
+        console.log('Incoming WhatsApp Webhook received!', req.body);
         const message = req.body;
         await whatsappService.handleIncomingMessage(message);
         res.status(200).send('OK');

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Brain, AlertTriangle, CheckCircle, Info, Loader2 } from 'lucide-react';
+import { Brain, AlertTriangle, CheckCircle, Info, Loader2, MessageSquare } from 'lucide-react';
 import { predictDisease, type HealthParameters, type PredictionResult } from '@/data/healthData';
 import aiPredictionImage from '@/assets/ai-prediction.jpg';
 
@@ -45,6 +45,17 @@ export function PredictionSection() {
     const res = predictDisease(params);
     setResults(res);
     setLoading(false);
+  };
+
+  const handleShareWhatsApp = () => {
+    if (!results) return;
+    
+    const summary = results.map(r => 
+      `*${r.disease}*: ${r.riskLevel} Risk (${r.probability}%)\n- Factors: ${r.factors.join(', ')}\n- Recommendation: ${r.recommendation}`
+    ).join('\n\n');
+    
+    const text = encodeURIComponent(`*HealthChain-AI Analysis Report*\n\n${summary}\n\n_Generated via HealthChain-AI_`);
+    window.open(`https://wa.me/?text=${text}`, '_blank');
   };
 
   const updateParam = (key: keyof HealthParameters, value: string) => {
@@ -210,6 +221,16 @@ export function PredictionSection() {
                       </div>
                     </motion.div>
                   ))}
+                  <motion.button
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
+                    onClick={handleShareWhatsApp}
+                    className="w-full bg-[#25D366] text-white font-semibold py-3 rounded-xl hover:opacity-90 transition-all duration-300 flex items-center justify-center gap-2 shadow-md mt-6"
+                  >
+                    <MessageSquare className="w-5 h-5" />
+                    Share Results to WhatsApp
+                  </motion.button>
                 </motion.div>
               ) : (
                 <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }} className="bg-card border border-border rounded-xl p-12 flex flex-col items-center justify-center min-h-[400px] text-center transition-colors duration-500">
